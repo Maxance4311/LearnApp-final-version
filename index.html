@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2563eb">
+  <title>LernApp Pro V11 - Tor-Sicher & Stats</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+  <!-- PWA & Apple Meta-Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LernApp">
+  <link rel="apple-touch-icon" sizes="180x180" href="logo.png">
+
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; transition: background-color 0.3s ease, color 0.3s ease; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .card-inner { transition: transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1); transform-style: preserve-3d; }
+    .card.flipped .card-inner { transform: rotateY(180deg); }
+    .card-front, .card-back { backface-visibility: hidden; }
+    .card-back { transform: rotateY(180deg); }
+    button, input, select, textarea { transition: all 0.2s ease; }
+    button:active { transform: scale(0.97); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-32 select-none" id="app-body">
+
+  <!-- TOR BROWSER / STORAGE WARNUNG BANNER -->
+  <div id="storage-warning-banner" class="hidden bg-amber-500 text-slate-950 px-4 py-2 text-center text-xs font-bold z-50 sticky top-0">
+    ⚠️ Hinweis: Lokaler Speicher ist gesperrt (evtl. Tor Browser / Privater Modus). Daten werden nur temporär in dieser Session gehalten![cite: 5]
+  </div>
+
+  <!-- VISUELLES FEEDBACK TOAST -->
+  <div id="toast-notification" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-300">
+    <div id="toast-content" class="bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 border border-slate-700">
+      <span id="toast-icon">⏳</span>
+      <span id="toast-text">Lade...</span>[cite: 5]
+    </div>
+  </div>
+
+  <!-- AUTH SCREEN -->
+  <div id="auth-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200">
+      <div class="text-center mb-6">
+        <span class="text-4xl">🎓</span>
+        <h2 class="text-2xl font-black text-slate-900 mt-2" id="auth-title">Willkommen zurück!</h2>
+        <p class="text-xs text-slate-500 mt-1" id="auth-subtitle">Sicher lernen – auch im Browser deiner Wahl.</p>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Benutzername</label>
+          <input type="text" id="auth-username" placeholder="z. B. Max123" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Passwort</label>
+          <input type="password" id="auth-password" placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs focus:outline-none focus:border-blue-500">
+        </div>
+
+        <button onclick="handleAuthSubmit()" id="auth-submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-xs shadow-md transition hover:shadow-lg">Anmelden</button>
+      </div>
+
+      <div class="mt-4 text-center">
+        <button onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-xs text-blue-600 font-bold hover:underline">Noch kein Konto? Jetzt registrieren</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="bg-white p-4 sticky top-0 z-40 flex justify-between items-center border-b border-slate-200 shadow-sm transition-colors duration-300" id="main-header">
+    <div class="flex items-center space-x-3">
+      <div id="header-avatar" class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs overflow-hidden bg-cover bg-center shadow-md">
+        <span id="header-avatar-text">U</span>
+      </div>
+      <div>
+        <h1 id="header-username" class="font-bold text-slate-900 text-xs">Lerner</h1>
+        <p class="text-[10px] text-slate-500">Level <span id="user-level">1</span> • <span id="user-rank-title">Anfänger</span></p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button onclick="openRanksModal()" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full text-xs font-bold transition hover:scale-105 flex items-center space-x-1 shadow-sm">
+        <span>⭐ <span id="user-xp">0</span> XP</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- SEITE 1: LERNEN & LERNMODUS -->
+  <section id="page-learn" class="page active p-4 max-w-md mx-auto">
+    
+    <!-- NEU: Mini-Fortschritts-Widget direkt auf dem Dashboard -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm mb-4 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">📊</div>
+        <div>
+          <p class="text-[10px] font-bold text-slate-400 uppercase">Tagesziel</p>
+          <p class="text-xs font-black text-slate-800"><span id="dashboard-daily-progress">0</span> / 10 Karten geschafft</p>
+        </div>
+      </div>
+      <div class="w-16 bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200">
+        <div id="dashboard-progress-bar" class="bg-blue-600 h-full w-0 transition-all duration-300"></div>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 text-white p-3 rounded-2xl mb-4 shadow-md">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Lern-Methode wählen</p>
+      <div class="grid grid-cols-2 gap-2 text-xs font-bold">
+        <button id="system-btn-spaced" onclick="setSystemMode('spaced')" class="py-2 px-3 rounded-xl bg-blue-600 text-white border border-blue-400 text-center transition hover:opacity-90">
+          📅 Fälligkeit & Limit<br><span class="text-[9px] font-normal opacity-80">(Max 10x / Tag)</span>
+        </button>
+        <button id="system-btn-infinite" onclick="setSystemMode('infinite')" class="py-2 px-3 rounded-xl bg-slate-800 text-slate-400 text-center transition hover:bg-slate-700">
+          ♾️ Unendlich Üben<br><span class="text-[9px] font-normal opacity-80">(Ohne Sperre)</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm mb-4 space-y-3 transition-colors duration-300" id="box-filter-card">
+      <div>
+        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Gruppe lernen</label>
+        <select id="select-card-group" onchange="changeStudyGroup()" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold focus:outline-none">
+          <option value="all">📁 Alle Karten (Keine Gruppe)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Lern-Kategorien (Modi)</label>
+        <select id="select-category-mode" onchange="changeCategoryMode()" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold focus:outline-none">
+          <option value="all">✨ Alle 3 Kategorien gemischt</option>
+          <option value="flip">🔄 Nur Karte umdrehen</option>
+          <option value="type">✍️ Nur Antwort schreiben</option>
+          <option value="choice">🔘 Nur Multiple Choice</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="due-info-banner" onclick="openDueScheduleModal()" class="bg-indigo-600 hover:bg-indigo-700 cursor-pointer text-white p-3.5 rounded-2xl shadow-md mb-4 flex justify-between items-center transition hover:scale-[1.01]">
+      <div>
+        <p class="text-[10px] font-bold uppercase tracking-wider opacity-80">Heute fällig zum Wiederholen</p>
+        <p class="text-lg font-black"><span id="due-count">0</span> Karteikarten</p>
+        <p class="text-[10px] underline opacity-90 mt-0.5">Klicke für Fälligkeits-Vorschau ➔</p>
+      </div>
+      <span class="text-2xl animate-pulse">⏳</span>
+    </div>
+
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm mb-4 transition-colors duration-300">
+      <div class="flex justify-between items-center mb-2">
+        <span class="text-xs font-bold text-slate-800">📦 Karteiboxen</span>
+        <button id="filter-reset-btn" onclick="filterByBox(0)" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-semibold hidden">
+          Alle zeigen
+        </button>
+      </div>
+      <div class="grid grid-cols-5 gap-1.5 text-center">
+        <button onclick="filterByBox(1)" class="box-filter-btn bg-rose-50 hover:bg-rose-100 border border-rose-200 p-2 rounded-xl text-rose-700 transition hover:scale-105" data-box="1">
+          <p class="text-[10px] font-bold">Box 1</p>
+          <p id="box-count-1" class="text-sm font-black">0</p>
+        </button>
+        <button onclick="filterByBox(2)" class="box-filter-btn bg-orange-50 hover:bg-orange-100 border border-orange-200 p-2 rounded-xl text-orange-700 transition hover:scale-105" data-box="2">
+          <p class="text-[10px] font-bold">Box 2</p>
+          <p id="box-count-2" class="text-sm font-black">0</p>
+        </button>
+        <button onclick="filterByBox(3)" class="box-filter-btn bg-amber-50 hover:bg-amber-100 border border-amber-200 p-2 rounded-xl text-amber-700 transition hover:scale-105" data-box="3">
+          <p class="text-[10px] font-bold">Box 3</p>
+          <p id="box-count-3" class="text-sm font-black">0</p>
+        </button>
+        <button onclick="filterByBox(4)" class="box-filter-btn bg-blue-50 hover:bg-blue-100 border border-blue-200 p-2 rounded-xl text-blue-700 transition hover:scale-105" data-box="4">
+          <p class="text-[10px] font-bold">Box 4</p>
+          <p id="box-count-4" class="text-sm font-black">0</p>
+        </button>
+        <button onclick="filterByBox(5)" class="box-filter-btn bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 p-2 rounded-xl text-emerald-700 transition hover:scale-105" data-box="5">
+          <p class="text-[10px] font-bold">Box 5</p>
+          <p id="box-count-5" class="text-sm font-black">0</p>
+        </button>
+      </div>
+    </div>
+
+    <div class="flex justify-between items-center mb-2">
+      <h2 class="text-sm font-bold text-slate-900" id="learn-title">Alle Karten</h2>
+      <span id="card-box-badge" class="text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200 shadow-sm">Box 1</span>
+    </div>
+
+    <div id="mode-container-flip">
+      <div id="flashcard-container" class="card w-full h-60 cursor-pointer perspective mb-4">
+        <div id="card-inner" class="card-inner relative w-full h-full bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between text-center shadow-md hover:shadow-xl">
+          <div class="card-front absolute inset-0 p-6 flex flex-col justify-center items-center">
+            <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-2">Frage</p>
+            <p id="card-question" class="text-lg font-bold text-slate-800">Keine Karteikarten vorhanden.</p>
+            <p id="card-review-count" class="text-[10px] text-slate-400 font-semibold mt-3"></p>
+          </div>
+          <div class="card-back absolute inset-0 p-6 flex flex-col justify-center items-center bg-slate-900 text-white rounded-2xl">
+            <p class="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-2">Antwort</p>
+            <p id="card-answer" class="text-base font-bold">Erstelle welche im Karten-Tab!</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-center space-x-3 mb-6">
+        <button onclick="nextCard(false)" class="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 py-3 rounded-xl font-bold w-1/2 text-xs shadow-sm transition hover:scale-[1.02]">
+          ❌ Nicht gewusst<br><span class="text-[9px] font-normal opacity-75">(Zurück auf Box 1)</span>
+        </button>
+        <button onclick="nextCard(true)" class="bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold w-1/2 text-xs shadow-md transition hover:scale-[1.02]">
+          ✅ Gewusst (+15 XP)<br><span class="text-[9px] font-normal opacity-90">(Eine Box höher)</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="mode-container-type" class="hidden">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 mb-4 shadow-sm text-center">
+        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Frage</p>
+        <p id="type-card-question" class="text-base font-bold text-slate-800 mb-4">Frage wird geladen...</p>
+
+        <input type="text" id="type-user-answer" placeholder="Deine Antwort eintippen..." class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs mb-3 text-center font-semibold focus:outline-none focus:border-blue-500">
+        <button onclick="checkTypedAnswer()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition">Antwort prüfen</button>
+
+        <div id="type-feedback" class="hidden mt-3 p-3 rounded-xl text-xs font-bold animate-fade-in"></div>
+      </div>
+    </div>
+
+    <div id="mode-container-choice" class="hidden">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 mb-4 shadow-sm text-center">
+        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Frage</p>
+        <p id="choice-card-question" class="text-base font-bold text-slate-800 mb-4">Frage wird geladen...</p>
+
+        <div id="choice-options-container" class="space-y-2"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEITE 2: KARTEIKARTEN VERWALTEN -->
+  <section id="page-manage" class="page p-4 max-w-md mx-auto">
+    <h2 class="text-lg font-bold text-slate-900 mb-3">Karten verwalten & erstellen</h2>
+    
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <h3 class="font-bold text-slate-900 text-xs mb-2">Neue Karte hinzufügen</h3>
+      <input type="text" id="new-q" placeholder="Frage..." class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs mb-2 focus:outline-none focus:border-blue-500">
+      <input type="text" id="new-a" placeholder="Antwort..." class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs mb-3 focus:outline-none focus:border-blue-500">
+      <button onclick="addCustomCard()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition">Speichern</button>
+    </div>
+
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-2xl shadow-md mb-4 space-y-3">
+      <div>
+        <h3 class="font-bold text-xs">📤 Karten teilen & 📥 Importieren</h3>
+        <p class="text-[10px] opacity-90 mt-0.5">Teile deine Karten als Datei oder importiere fremde Karteikarten.</p>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="exportCardsFile()" class="bg-white text-blue-600 py-2 rounded-xl text-xs font-bold shadow hover:bg-blue-50 transition text-center">📤 Exportieren</button>
+        <label class="bg-blue-800 hover:bg-blue-900 text-white py-2 rounded-xl text-xs font-bold shadow transition text-center cursor-pointer">
+          📥 Importieren
+          <input type="file" id="import-file-input" accept=".json" class="hidden" onchange="importCardsFile(event)">
+        </label>
+      </div>
+    </div>
+
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm mb-4 flex justify-between items-center">
+      <span class="text-xs font-bold text-slate-700">🖨️ Karten als Liste drucken</span>
+      <button onclick="openSharePrintModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl text-xs font-bold transition">Öffnen</button>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <h3 class="font-bold text-slate-900 text-xs mb-2">📁 Karten zu Gruppe zusammenfassen</h3>
+      <input type="text" id="group-name-input" placeholder="Gruppenname (z. B. Biologie Vokabeln)" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs mb-2 focus:outline-none">
+      <p class="text-[10px] text-slate-500 mb-2">Wähle unten Karten aus, die in diese Gruppe sollen:</p>
+      <div id="group-selection-list" class="max-h-40 overflow-y-auto space-y-1.5 mb-3 border border-slate-100 p-2 rounded-xl bg-slate-50"></div>
+      <button onclick="saveCardGroup()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition">Gruppe erstellen</button>
+    </div>
+
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm mb-3 space-y-2">
+      <input type="text" id="search-card-input" oninput="renderManageCards()" placeholder="🔍 Karten durchsuchen..." class="w-full bg-slate-50 border border-slate-200 p-2 rounded-xl text-xs focus:outline-none">
+    </div>
+
+    <h3 class="font-bold text-slate-900 text-xs mb-2">Gespeicherte Karten</h3>
+    <div id="card-manage-list" class="space-y-2"></div>
+  </section>
+
+  <!-- SEITE 3: KI GENERATOR, FOTO SCANNER, ZUSAMMENFASSUNG & FRAGETRAINER -->
+  <section id="page-ai" class="page p-4 max-w-md mx-auto space-y-4">
+    <h2 class="text-lg font-bold text-slate-900 mb-1">KI-Generator & Lern-Tools</h2>
+    
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <h3 class="font-bold text-slate-900 text-xs mb-1">📝 Zusammenfassungs-Generator</h3>
+      <p class="text-[10px] text-slate-500 mb-2">Füge längere Texte ein, um eine prägnante Übersicht zu erhalten.</p>
+      <textarea id="summary-text-input" rows="3" placeholder="Längeren Text hier einfügen..." class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs mb-2 focus:outline-none"></textarea>
+      <button onclick="generateSummary()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition">Zusammenfassung erstellen</button>
+      <div id="summary-result-box" class="hidden mt-3 p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs text-slate-700 space-y-1"></div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <h3 class="font-bold text-slate-900 text-xs mb-1">💡 Interaktiver Fragetrainer</h3>
+      <p class="text-[10px] text-slate-500 mb-2">Stelle eine Frage oder gib ein Thema an – du erhältst Denkanstöße statt direkter Lösungen.</p>
+      <input type="text" id="question-trainer-input" placeholder="z. B. Wie funktioniert Photosynthese?" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs mb-2 focus:outline-none">
+      <button onclick="startQuestionTrainer()" class="w-full bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition">Denkanstoß anfordern</button>
+      <div id="trainer-result-box" class="hidden mt-3 p-3 bg-amber-50/60 border border-amber-100 rounded-xl text-xs text-slate-700 space-y-1"></div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <h3 class="font-bold text-slate-900 text-xs mb-1">📷 Fotos / Buchseiten hochladen</h3>
+      <p class="text-[10px] text-slate-500 mb-2">Scanne Seiten oder Dokumente direkt ein!</p>
+      
+      <input type="file" id="ai-image-input" accept="image/*" multiple class="w-full text-xs text-slate-500 mb-3 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700">
+      
+      <button onclick="processImagesOCR()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition">Bilder analysieren & Fragen generieren</button>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+      <label class="block text-xs font-bold text-slate-600 mb-2">Text oder Vokabeln eingeben:</label>
+      <textarea id="ai-text-input" rows="3" placeholder="Füge hier deinen Text ein..." class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs mb-3 focus:outline-none"></textarea>
+      
+      <button onclick="generateAICardsFromText()" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-xl font-bold text-xs shadow-sm transition">Text in Fragen umwandeln</button>
+    </div>
+
+    <div id="ai-status" class="hidden bg-blue-50 text-blue-700 p-3 rounded-xl text-center text-xs font-medium border border-blue-200">
+      <p id="ai-status-text">Scanne Bild...</p>
+    </div>
+  </section>
+
+  <!-- SEITE 4: POMODORO TIMER -->
+  <section id="page-pomodoro" class="page p-4 max-w-md mx-auto">
+    <h2 class="text-lg font-bold text-slate-900 mb-3 text-center">🍅 Pomodoro Lern-Timer</h2>
+    
+    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm text-center mb-4">
+      <div id="pomodoro-status-badge" class="inline-block bg-blue-100 text-blue-800 font-bold text-xs px-3 py-1 rounded-full mb-4">
+        Lernphase (25 Min)
+      </div>
+      
+      <div id="pomodoro-display" class="text-5xl font-black text-slate-900 mb-6 tracking-wider">
+        25:00
+      </div>
+
+      <div class="mb-4 text-left">
+        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Timer-Option wählen</label>
+        <select id="pomodoro-mode-select" onchange="changePomodoroMode()" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold focus:outline-none mb-3">
+          <option value="25-5">Standard: 25 Min Lernen / 5 Min Pause</option>
+          <option value="custom">Individuell (Selbst aussuchen)</option>
+        </select>
+        
+        <div id="pomodoro-custom-container" class="hidden grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Lernzeit (Min)</label>
+            <input type="number" id="custom-study-time" value="25" min="1" max="120" class="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-bold text-center">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Pause (Min)</label>
+            <input type="number" id="custom-break-time" value="5" min="1" max="60" class="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs font-bold text-center">
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <button onclick="startPomodoro()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-xs shadow-md transition">Starten</button>
+        <button onclick="stopPomodoro()" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold text-xs shadow-md transition">Stoppen</button>
+        <button onclick="resetPomodoro()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold text-xs border border-slate-200 transition">Zurücksetzen</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEITE 5: PRÜFUNGSKALENDER -->
+  <section id="page-calendar" class="page p-4 max-w-md mx-auto">
+    <h2 class="text-lg font-bold text-slate-900 mb-3">Prüfungskalender & Lernplan</h2>
+    
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-5">
+      <h3 class="font-bold text-slate-900 text-xs mb-2">Neue Prüfung eintragen</h3>
+      <input type="text" id="exam-title" placeholder="Fach / Thema" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs mb-2 focus:outline-none">
+      <input type="date" id="exam-date" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs mb-3 focus:outline-none">
+      <button onclick="addExam()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition">Speichern</button>
+    </div>
+
+    <h3 class="font-bold text-slate-900 text-xs mb-2">Anstehende Prüfungen</h3>
+    <div id="exam-list" class="space-y-3"></div>
+  </section>
+
+  <!-- SEITE 6: ABO & SUBSCRIPTIONS -->
+  <section id="page-subscription" class="page p-4 max-w-md mx-auto">
+    <div class="text-center mb-4">
+      <span class="text-3xl">💎</span>
+      <h2 class="text-xl font-black text-slate-900 mt-1">Wähle deinen Lern-Plan</h2>
+      <p class="text-xs text-slate-500 mt-0.5">Schalte alle Features frei & lerne ohne Einschränkungen!</p>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-4 relative">
+      <div class="flex justify-between items-start mb-2">
+        <div>
+          <h3 class="font-bold text-slate-900 text-sm">Basic / Free</h3>
+          <p class="text-[10px] text-slate-500">Für den Einstieg</p>
+        </div>
+        <span class="text-base font-black text-slate-900">0 € <span class="text-[10px] font-normal text-slate-400">/ dauerhaft</span></span>
+      </div>
+      <ul class="text-xs text-slate-600 space-y-1.5 my-3">
+        <li class="flex items-center">✓ <span class="ml-1.5">Maximal 10 Wiederholungen/Tag</span></li>
+        <li class="flex items-center">✓ <span class="ml-1.5">Bis zu 50 Karteikarten</span></li>
+        <li class="flex items-center text-slate-400">✕ <span class="ml-1.5">Kein KI-Fotoscanner</span></li>
+      </ul>
+      <button onclick="selectSubscription('Free')" id="sub-btn-free" class="w-full bg-slate-100 text-slate-700 py-2.5 rounded-xl font-bold text-xs border border-slate-200">Aktueller Plan</button>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border-2 border-blue-600 shadow-md mb-4 relative">
+      <span class="absolute -top-3 right-4 bg-blue-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full">Beliebt</span>
+      <div class="flex justify-between items-start mb-2">
+        <div>
+          <h3 class="font-bold text-slate-900 text-sm">Pro Monat</h3>
+          <p class="text-[10px] text-blue-600 font-semibold">Monatlich kündbar</p>
+        </div>
+        <span class="text-base font-black text-slate-900">4,99 € <span class="text-[10px] font-normal text-slate-400">/ Monat</span></span>
+      </div>
+      <ul class="text-xs text-slate-600 space-y-1.5 my-3">
+        <li class="flex items-center">✓ <span class="ml-1.5">Unbegrenztes Üben (Keine Limits)</span></li>
+        <li class="flex items-center">✓ <span class="ml-1.5">Unbegrenzte Karteikarten</span></li>
+        <li class="flex items-center">✓ <span class="ml-1.5">Unbegrenzter KI-Fotoscanner</span></li>
+        <li class="flex items-center">✓ <span class="ml-1.5">Prüfungskalender & Statistiken</span></li>
+      </ul>
+      <button onclick="selectSubscription('Pro Monat')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition">7 Tage kostenlos testen</button>
+    </div>
+
+    <div class="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md mb-4 relative">
+      <div class="flex justify-between items-start mb-2">
+        <div>
+          <h3 class="font-bold text-white text-sm">Lifetime Pro</h3>
+          <p class="text-[10px] text-amber-400 font-semibold">Einmalig zahlen, für immer nutzen</p>
+        </div>
+        <span class="text-base font-black text-white">29,99 € <span class="text-[10px] font-normal text-slate-400">/ einmalig</span></span>
+      </div>
+      <ul class="text-xs text-slate-300 space-y-1.5 my-3">
+        <li class="flex items-center">⭐ <span class="ml-1.5">Alle Pro-Funktionen lebenslang</span></li>
+        <li class="flex items-center">⭐ <span class="ml-1.5">Keine wiederkehrenden Kosten</span></li>
+        <li class="flex items-center">⭐ <span class="ml-1.5">Bevorzugter KI-Support</span></li>
+      </ul>
+      <button onclick="selectSubscription('Lifetime Pro')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 py-2.5 rounded-xl font-bold text-xs transition">Lebenslang freischalten</button>
+    </div>
+  </section>
+
+  <!-- SEITE 7: PROFIL & STATISTIKEN -->
+  <section id="page-profile" class="page p-4 max-w-md mx-auto">
+    <h2 class="text-lg font-bold text-slate-900 mb-3">Dein Profil</h2>
+    
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center mb-4">
+      <div class="relative w-20 h-20 mx-auto mb-3">
+        <div id="profile-img-preview" class="w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xl border-2 border-blue-500 overflow-hidden bg-cover bg-center shadow-sm">
+          <span id="profile-img-placeholder">U</span>
+        </div>
+        <label for="profile-img-input" class="absolute bottom-0 right-0 bg-blue-600 text-white p-1.5 rounded-full cursor-pointer text-[10px] shadow-md hover:scale-110 transition">📷</label>
+        <input type="file" id="profile-img-input" accept="image/*" class="hidden" onchange="uploadProfileImage(event)">
+      </div>
+      
+      <p id="username-display" class="font-bold text-base text-slate-900 mb-1">Lerner</p>
+
+      <div class="flex justify-center items-center space-x-2 text-xs text-slate-500 mb-4">
+        <span>Level <strong id="profile-level" class="text-slate-800">1</strong></span>
+        <span>•</span>
+        <span id="profile-rank-badge" class="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-bold">Anfänger</span>
+      </div>
+
+      <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 mb-4 text-left space-y-3">
+        <p class="text-xs font-bold text-slate-800">⚙ Personalisierung & Design</p>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Anzeigename ändern</label>
+          <div class="flex space-x-2">
+            <input type="text" id="settings-username-input" placeholder="Neuer Name..." class="w-full bg-white border border-slate-200 p-2 rounded-xl text-xs focus:outline-none">
+            <button onclick="updateUsername()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl font-bold text-xs shadow-sm">Speichern</button>
+          </div>
+        </div>
+        <div class="flex justify-between items-center pt-1 border-t border-slate-200">
+          <div>
+            <p class="text-xs font-semibold text-slate-700">Dark Mode (Dunkles Design)</p>
+            <p class="text-[10px] text-slate-500">Schont die Augen bei Nacht</p>
+          </div>
+          <button onclick="toggleDarkMode()" id="dark-mode-toggle-btn" class="bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl font-bold text-xs shadow-sm">Aktivieren</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 mb-4 text-left">
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <p class="text-[10px] text-slate-500 font-bold">Heute gelernt</p>
+          <p class="text-base font-black text-slate-800" id="stat-learned-today">0 Karten</p>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <p class="text-[10px] text-slate-500 font-bold">Erfolgsquote</p>
+          <p class="text-base font-black text-emerald-600" id="stat-accuracy">100%</p>
+        </div>
+      </div>
+
+      <button onclick="logout()" class="w-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 py-2.5 rounded-xl font-bold text-xs transition">Abmelden</button>
+    </div>
+  </section>
+
+  <!-- MODALS -->
+  <div id="share-print-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-5 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center mb-3 border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-slate-900 text-base">🖨 Alle Karten teilen & drucken</h3>
+        <button onclick="closeSharePrintModal()" class="text-slate-400 font-bold text-lg hover:text-slate-600">✕</button>
+      </div>
+      <p class="text-xs text-slate-500 mb-3">Hier siehst du alle deine Karteikarten als kompakte Liste. Du kannst sie ausdrucken oder den Text für andere teilen.</p>
+      
+      <div id="print-cards-container" class="space-y-2 mb-4 max-h-60 overflow-y-auto border border-slate-200 p-3 rounded-2xl bg-slate-50 text-xs"></div>
+
+      <div class="flex space-x-2">
+        <button onclick="printAllCards()" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition">Jetzt drucken / PDF</button>
+        <button onclick="copyCardsText()" class="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl font-bold text-xs border border-slate-200 transition">Als Text kopieren</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="due-schedule-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-5 max-w-md w-full shadow-xl border border-slate-200">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="font-bold text-slate-900 text-base">⏳ Vorschau: Fällige Karten</h3>
+        <button onclick="closeDueScheduleModal()" class="text-slate-400 font-bold text-lg">✕</button>
+      </div>
+      <p class="text-xs text-slate-500 mb-3">Übersicht, wann deine nächsten Karten fällig werden:</p>
+      <div id="due-schedule-list" class="space-y-2 mb-2"></div>
+    </div>
+  </div>
+
+  <div id="ranks-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-5 max-w-md w-full max-h-[80vh] overflow-y-auto shadow-xl border border-slate-200">
+      <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-slate-900 text-base">XP-Ränge & Stufen</h3>
+        <button onclick="closeRanksModal()" class="text-slate-400 font-bold text-lg">✕</button>
+      </div>
+      <div id="ranks-list" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- NAVIGATION -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-3 z-40 shadow-lg transition-colors duration-300 pb-safe" id="main-nav">
+    <button onclick="showPage('learn')" class="flex flex-col items-center text-[11px] font-semibold text-slate-400 hover:scale-105 transition" id="nav-btn-learn">
+      <span class="text-2xl mb-0.5">🎴</span> Lernen
+    </button>
+    <button onclick="showPage('manage')" class="flex flex-col items-center text-[11px] font-semibold text-slate-400 hover:scale-105 transition" id="nav-btn-manage">
+      <span class="text-2xl mb-0.5">✏️</span> Karten
+    </button>
+    <button onclick="showPage('ai')" class="flex flex-col items-center text-[11px] font-semibold text-slate-400 hover:scale-105 transition" id="nav-btn-ai">
+      <span class="text-2xl mb-0.5">⚡</span> KI
+    </button>
+    <button onclick="showPage('pomodoro')" class="flex flex-col items-center text-[11px] font-semibold text-slate-400 hover:scale-105 transition" id="nav-btn-pomodoro">
+      <span class="text-2xl mb-0.5">⏱️</span> Timer
+    </button>
+    <button onclick="showPage('calendar')" class="flex flex-col items-center text-[11px] font-semibold text-slate-400 hover:scale-105 transition" id="nav-btn-calendar">
+      <span class="text-2xl mb-0.5">📅</span> Kalender
+    </button>
+    <button onclick="showPage('subscription')" class="flex flex-col items-center text-[11px] font-semibold text-slate-400 hover:scale-105 transition" id="nav-btn-subscription">
+      <span class="text-2xl mb-0.5">💎</span> Abo
+    </button>
+    <button onclick="showPage('profile')" class="flex flex-col items-center text-[11px] font-semibold text-slate-400 hover:scale-105 transition" id="nav-btn-profile">
+      <span class="text-2xl mb-0.5">👤</span> Profil
+    </button>
+  </nav>
+
+  <script>
+    const BOX_INTERVALS = { 1: 0, 2: 1, 3: 3, 4: 7, 5: 30 };
+    const MAX_DAILY_REVIEWS_PER_CARD = 10;
+
+    const RANKS = [
+      { minXp: 0, level: 1, title: "Anfänger" },
+      { minXp: 50, level: 2, title: "Lern-Novize" },
+      { minXp: 150, level: 3, title: "Wissenssucher" },
+      { minXp: 300, level: 4, title: "Karten-Profi" },
+      { minXp: 500, level: 5, title: "Lernmeister" },
+      { minXp: 800, level: 6, title: "Gedächtnis-Genie" }
+    ];
+
+    let isRegisterMode = false;
+    let activeCard = null;
+    let selectedBoxFilter = 0;
+    let systemMode = 'spaced';
+    let selectedGroupFilter = 'all';
+    let selectedCategoryMode = 'all';
+
+    // Sicheres Storage (Tor-Browser Fallback im Arbeitsspeicher)
+    let memoryStorageFallback = {};
+    let isStorageAvailable = true;
+
+    function testLocalStorage() {
+      try {
+        const testKey = '__test__';
+        localStorage.setItem(testKey, testKey);
+        localStorage.removeItem(testKey);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function safeGetItem(key) {
+      if (isStorageAvailable) {
+        try { return localStorage.getItem(key); } catch (e) { return memoryStorageFallback[key] || null; }
+      }
+      return memoryStorageFallback[key] || null;
+    }
+
+    function safeSetItem(key, value) {
+      if (isStorageAvailable) {
+        try {
+          localStorage.setItem(key, value);
+        } catch (e) {
+          isStorageAvailable = false;
+          memoryStorageFallback[key] = value;
+          document.getElementById('storage-warning-banner').classList.remove('hidden');
+        }
+      } else {
+        memoryStorageFallback[key] = value;
+      }
+    }
+
+    // Pomodoro State
+    let pomodoroTimer = null;
+    let pomodoroTimeLeft = 25 * 60;
+    let pomodoroIsStudyPhase = true;
+    let pomodoroRunning = false;
+
+    let state = {
+      username: '',
+      password: '',
+      xp: 0,
+      avatar: '',
+      darkMode: false,
+      cards: [],
+      cardGroups: {},
+      exams: [],
+      stats: { learnedToday: 0, correct: 0, totalAnswered: 0, lastLearnedDate: '' }
+    };
+
+    function showToast(text, icon = '✨', duration = 2500) {
+      const toast = document.getElementById('toast-notification');
+      document.getElementById('toast-text').innerText = text;
+      document.getElementById('toast-icon').innerText = icon;
+      toast.style.opacity = '1';
+      setTimeout(() => {
+        toast.style.opacity = '0';
+      }, duration);
+    }
+
+    function getAllUsersFromCloud() {
+      try {
+        let raw = safeGetItem('global_app_users_db');
+        return raw ? JSON.parse(raw) : {};
+      } catch(e) {
+        return {};
+      }
+    }
+
+    function saveUserToCloud() {
+      if(!state.username) return;
+      let db = getAllUsersFromCloud();
+      db[state.username.toLowerCase()] = state;
+      safeSetItem('global_app_users_db', JSON.stringify(db));
+    }
+
+    function toggleAuthMode() {
+      isRegisterMode = !isRegisterMode;
+      document.getElementById('auth-title').innerText = isRegisterMode ? "Konto erstellen" : "Willkommen zurück!";
+      document.getElementById('auth-submit-btn').innerText = isRegisterMode ? "Registrieren" : "Anmelden";
+      document.getElementById('auth-toggle-btn').innerText = isRegisterMode ? "Bereits ein Konto? Anmelden" : "Noch kein Konto? Jetzt registrieren";
+    }
+
+    function handleAuthSubmit() {
+      const userVal = document.getElementById('auth-username').value.trim();
+      const passVal = document.getElementById('auth-password').value.trim();
+      if(!userVal || !passVal) return alert("Bitte Benutzername und Passwort eingeben!");
+
+      let db = getAllUsersFromCloud();
+      let key = userVal.toLowerCase();
+
+      if(isRegisterMode) {
+        if(db[key]) return alert("Dieser Benutzername ist bereits vergeben!");
+        state = {
+          username: userVal,
+          password: passVal,
+          xp: 0,
+          avatar: '',
+          darkMode: false,
+          cards: [
+            { id: 1, q: "Was ist 2 + 2?", a: "4", box: 1, nextReview: Date.now(), dailyCount: 0, lastReviewDate: '' },
+            { id: 2, q: "Hauptstadt von Deutschland?", a: "Berlin", box: 1, nextReview: Date.now(), dailyCount: 0, lastReviewDate: '' }
+          ],
+          cardGroups: {},
+          exams: [],
+          stats: { learnedToday: 0, correct: 0, totalAnswered: 0, lastLearnedDate: '' }
+        };
+        saveUserToCloud();
+        loginSuccess(userVal);
+      } else {
+        if(!db[key] || db[key].password !== passVal) return alert("Zugangsdaten falsch!");
+        state = db[key];
+        if(!state.cardGroups) state.cardGroups = {};
+        if(state.darkMode === undefined) state.darkMode = false;
+        loginSuccess(userVal);
+      }
+    }
+
+    function loginSuccess(username) {
+      safeSetItem('active_session_user', username);
+      document.getElementById('auth-screen').classList.add('hidden');
+      checkDailyReset();
+      updateUI();
+      renderGroupDropdowns();
+      renderNextSpacedCard();
+      renderManageCards();
+      renderGroupSelectionList();
+      renderExams();
+      applyTheme();
+      showPage('learn');
+      showToast("Erfolgreich angemeldet!", "👋");
+    }
+
+    function logout() {
+      safeSetItem('active_session_user', '');
+      location.reload();
+    }
+
+    function checkSession() {
+      isStorageAvailable = testLocalStorage();
+      if (!isStorageAvailable) {
+        document.getElementById('storage-warning-banner').classList.remove('hidden');
+      }
+
+      const activeUser = safeGetItem('active_session_user');
+      if(activeUser) {
+        let db = getAllUsersFromCloud();
+        if(db[activeUser.toLowerCase()]) {
+          state = db[activeUser.toLowerCase()];
+          if(!state.cardGroups) state.cardGroups = {};
+          if(state.darkMode === undefined) state.darkMode = false;
+          if(!state.stats) state.stats = { learnedToday: 0, correct: 0, totalAnswered: 0, lastLearnedDate: '' };
+          document.getElementById('auth-screen').classList.add('hidden');
+          checkDailyReset();
+          updateUI();
+          renderGroupDropdowns();
+          renderNextSpacedCard();
+          renderManageCards();
+          renderGroupSelectionList();
+          renderExams();
+          applyTheme();
+          showPage('learn');
+        }
+      }
+    }
+
+    function updateUsername() {
+      const newName = document.getElementById('settings-username-input').value.trim();
+      if(!newName) return alert("Bitte einen gültigen Namen eingeben!");
+      
+      let db = getAllUsersFromCloud();
+      if(db[newName.toLowerCase()] && newName.toLowerCase() !== state.username.toLowerCase()) {
+        return alert("Dieser Benutzername ist bereits vergeben!");
+      }
+
+      delete db[state.username.toLowerCase()];
+      state.username = newName;
+      saveUserToCloud();
+      safeSetItem('active_session_user', newName);
+      document.getElementById('settings-username-input').value = '';
+      updateUI();
+      showToast("Benutzername aktualisiert!", "👤");
+    }
+
+    function toggleDarkMode() {
+      state.darkMode = !state.darkMode;
+      saveState();
+      applyTheme();
+    }
+
+    function applyTheme() {
+      const body = document.getElementById('app-body');
+      const header = document.getElementById('main-header');
+      const nav = document.getElementById('main-nav');
+      const btn = document.getElementById('dark-mode-toggle-btn');
+
+      if (state.darkMode) {
+        body.className = "bg-slate-950 text-slate-100 min-h-screen pb-32 select-none transition-colors duration-300";
+        if(header) header.className = "bg-slate-900 p-4 sticky top-0 z-40 flex justify-between items-center border-b border-slate-800 shadow-sm transition-colors duration-300";
+        if(nav) nav.className = "fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around p-3 z-40 shadow-lg transition-colors duration-300 pb-safe";
+        if(btn) {
+          btn.innerText = "Deaktivieren";
+          btn.className = "bg-blue-600 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-sm";
+        }
+      } else {
+        body.className = "bg-slate-50 text-slate-800 min-h-screen pb-32 select-none transition-colors duration-300";
+        if(header) header.className = "bg-white p-4 sticky top-0 z-40 flex justify-between items-center border-b border-slate-200 shadow-sm transition-colors duration-300";
+        if(nav) nav.className = "fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-3 z-40 shadow-lg transition-colors duration-300 pb-safe";
+        if(btn) {
+          btn.innerText = "Aktivieren";
+          btn.className = "bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl font-bold text-xs shadow-sm";
+        }
+      }
+    }
+
+    function exportCardsFile() {
+      if (state.cards.length === 0) return alert("Du hast keine Karteikarten zum Exportieren!");
+      
+      showToast("Exportiere Datei...", "📥");
+      let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.cards, null, 2));
+      let downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `${state.username || 'Meine'}_Karteikarten.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setTimeout(() => showToast("Erfolgreich heruntergeladen!", "✅"), 800);
+    }
+
+    function importCardsFile(event) {
+      let file = event.target.files[0];
+      if (!file) return;
+
+      showToast("Importiere Karten...", "📂");
+      let reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          let importedCards = JSON.parse(e.target.result);
+          if (Array.isArray(importedCards)) {
+            let addedCount = 0;
+            importedCards.forEach(ic => {
+              if (ic.q && ic.a) {
+                state.cards.push({
+                  id: Date.now() + Math.random(),
+                  q: ic.q,
+                  a: ic.a,
+                  box: ic.box || 1,
+                  nextReview: Date.now(),
+                  dailyCount: 0,
+                  lastReviewDate: ''
+                });
+                addedCount++;
+              }
+            });
+            saveState();
+            renderManageCards();
+            renderGroupSelectionList();
+            renderNextSpacedCard();
+            showToast(`${addedCount} Karten importiert!`, "🎉");
+          } else {
+            alert("Ungültiges Dateiformat.");
+          }
+        } catch(err) {
+          alert("Fehler beim Lesen der JSON-Datei: " + err);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function generateSummary() {
+      const text = document.getElementById('summary-text-input').value.trim();
+      const resultBox = document.getElementById('summary-result-box');
+      if(!text) return alert("Bitte füge zuerst einen Text ein!");
+
+      showToast("Generiere Zusammenfassung...", "⚡");
+      setTimeout(() => {
+        resultBox.classList.remove('hidden');
+        resultBox.innerHTML = `
+          <p class="font-bold text-indigo-900 mb-1">📌 Zusammenfassung & Kernpunkte:</p>
+          <p>• Hauptthema des Textes behandelt: "${text.substring(0, 40)}..."</p>
+          <p>• Wichtigste Erkenntnis: Strukturiertes Lernen und regelmäßige Wiederholung maximieren den langfristigen Lernerfolg.</p>
+          <p class="text-[10px] text-indigo-500 mt-1">Zusammenfassung erfolgreich generiert (+10 XP)</p>
+        `;
+        state.xp += 10;
+        saveState();
+        showToast("Zusammenfassung erstellt!", "✅");
+      }, 600);
+    }
+
+    function startQuestionTrainer() {
+      const query = document.getElementById('question-trainer-input').value.trim();
+      const resultBox = document.getElementById('trainer-result-box');
+      if(!query) return alert("Bitte gib eine Frage oder ein Thema ein!");
+
+      showToast("Analysiere Frage...", "💡");
+      setTimeout(() => {
+        resultBox.classList.remove('hidden');
+        resultBox.innerHTML = `
+          <p class="font-bold text-amber-900 mb-1">🤔 Denkanstöße zu "${query}":</p>
+          <p>1. Überlege zunächst: Welches grundlegende Prinzip liegt diesem Konzept zugrunde?</p>
+          <p>2. Versuche das Thema in eigenen Worten zu erklären, anstatt Formeln oder Definitionen auswendig zu lernen.</p>
+          <p>3. Welches reale Alltagsbeispiel könnte dir helfen, dir das vorzustellen?</p>
+          <p class="text-[10px] text-amber-600 mt-1">Fragetrainer hat Denkanstöße geliefert (+10 XP)</p>
+        `;
+        state.xp += 10;
+        saveState();
+        showToast("Denkanstöße bereitgestellt!", "✨");
+      }, 600);
+    }
+
+    function openSharePrintModal() {
+      document.getElementById('share-print-modal').classList.remove('hidden');
+      const container = document.getElementById('print-cards-container');
+      container.innerHTML = '';
+      if (state.cards.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">Keine Karten zum Drucken vorhanden.</p>`;
+        return;
+      }
+      state.cards.forEach((c, idx) => {
+        container.innerHTML += `
+          <div class="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex justify-between">
+            <span class="font-bold text-slate-800">#${idx+1} Q: ${c.q}</span>
+            <span class="text-slate-600 font-semibold">A: ${c.a}</span>
+          </div>`;
+      });
+    }
+
+    function closeSharePrintModal() {
+      document.getElementById('share-print-modal').classList.add('hidden');
+    }
+
+    function printAllCards() {
+      let printContent = `<html><head><title>Karteikarten Export</title><style>body{font-family:sans-serif;padding:20px;} .card{margin-bottom:15px;padding:10px;border:1px solid #ccc;border-radius:8px;}</style></head><body>`;
+      printContent += `<h2>Meine Karteikarten (${state.cards.length} Stk.)</h2>`;
+      state.cards.forEach((c, idx) => {
+        printContent += `<div class="card"><strong>#${idx+1} Frage:</strong> ${c.q}<br><strong>Antwort:</strong> ${c.a}</div>`;
+      });
+      printContent += `</body></html>`;
+      let printWindow = window.open('', '_blank');
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
+
+    function copyCardsText() {
+      let text = state.cards.map((c, i) => `${i+1}. Frage: ${c.q} | Antwort: ${c.a}`).join("\n");
+      navigator.clipboard.writeText(text).then(() => {
+        showToast("In Zwischenablage kopiert!", "📋");
+      });
+    }
+
+    function checkDailyReset() {
+      const today = new Date().toISOString().split('T')[0];
+      if (state.stats.lastLearnedDate !== today) {
+        state.stats.learnedToday = 0;
+        state.stats.lastLearnedDate = today;
+        state.cards.forEach(c => {
+          if (c.lastReviewDate !== today) {
+            c.dailyCount = 0;
+            c.lastReviewDate = today;
+          }
+        });
+        saveState();
+      }
+    }
+
+    function setSystemMode(mode) {
+      systemMode = mode;
+      document.getElementById('system-btn-spaced').className = mode === 'spaced' ? 'py-2 px-3 rounded-xl bg-blue-600 text-white border border-blue-400 text-center transition' : 'py-2 px-3 rounded-xl bg-slate-800 text-slate-400 text-center transition';
+      document.getElementById('system-btn-infinite').className = mode === 'infinite' ? 'py-2 px-3 rounded-xl bg-blue-600 text-white border border-blue-400 text-center transition' : 'py-2 px-3 rounded-xl bg-slate-800 text-slate-400 text-center transition';
+      document.getElementById('due-info-banner').style.display = mode === 'spaced' ? 'flex' : 'none';
+      renderNextSpacedCard();
+    }
+
+    function changeStudyGroup() {
+      selectedGroupFilter = document.getElementById('select-card-group').value;
+      renderNextSpacedCard();
+    }
+
+    function changeCategoryMode() {
+      selectedCategoryMode = document.getElementById('select-category-mode').value;
+      renderNextSpacedCard();
+    }
+
+    function saveState() {
+      saveUserToCloud();
+      updateUI();
+    }
+
+    function showPage(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-' + pageId).classList.add('active');
+
+      const navButtons = {
+        'learn': 'nav-btn-learn',
+        'manage': 'nav-btn-manage',
+        'ai': 'nav-btn-ai',
+        'pomodoro': 'nav-btn-pomodoro',
+        'calendar': 'nav-btn-calendar',
+        'subscription': 'nav-btn-subscription',
+        'profile': 'nav-btn-profile'
+      };
+
+      Object.keys(navButtons).forEach(id => {
+        const btn = document.getElementById(navButtons[id]);
+        if(btn) {
+          if(id === pageId) {
+            btn.className = "flex flex-col items-center text-[11px] font-semibold text-blue-600 hover:scale-105 transition";
+          } else {
+            btn.className = "flex flex-col items-center text-[11px] font-semibold text-slate-400 hover:scale-105 transition";
+          }
+        }
+      });
+    }
+
+    function selectSubscription(planName) {
+      alert(`[Testversion] Du hast den Plan "${planName}" gewählt!`);
+    }
+
+    document.getElementById('flashcard-container').addEventListener('click', function() {
+      if(activeCard) this.classList.toggle('flipped');
+    });
+
+    function getCurrentRank(xp) {
+      let current = RANKS[0];
+      for (let r of RANKS) {
+        if (xp >= r.minXp) current = r;
+      }
+      return current;
+    }
+
+    function updateUI() {
+      document.getElementById('header-username').innerText = state.username || 'Lerner';
+      document.getElementById('username-display').innerText = state.username || 'Lerner';
+      document.getElementById('user-xp').innerText = state.xp;
+
+      let rank = getCurrentRank(state.xp);
+      document.getElementById('user-level').innerText = rank.level;
+      document.getElementById('user-rank-title').innerText = rank.title;
+      document.getElementById('profile-level').innerText = rank.level;
+      document.getElementById('profile-rank-badge').innerText = rank.title;
+
+      let counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      state.cards.forEach(c => { if(counts[c.box] !== undefined) counts[c.box]++; });
+      for (let i = 1; i <= 5; i++) {
+        document.getElementById(`box-count-${i}`).innerText = counts[i];
+      }
+
+      document.getElementById('stat-learned-today').innerText = state.stats.learnedToday + " Karten";
+      let acc = state.stats.totalAnswered > 0 ? Math.round((state.stats.correct / state.stats.totalAnswered) * 100) : 100;
+      document.getElementById('stat-accuracy').innerText = acc + "%";
+
+      // Dashboard Widget Update
+      let dailyProg = Math.min(state.stats.learnedToday, 10);
+      document.getElementById('dashboard-daily-progress').innerText = dailyProg;
+      document.getElementById('dashboard-progress-bar').style.width = (dailyProg * 10) + '%';
+
+      let avatarElem = document.getElementById('header-avatar');
+      let previewElem = document.getElementById('profile-img-preview');
+      if (state.avatar) {
+        avatarElem.style.backgroundImage = `url(${state.avatar})`;
+        avatarElem.innerHTML = '';
+        previewElem.style.backgroundImage = `url(${state.avatar})`;
+        document.getElementById('profile-img-placeholder').style.display = 'none';
+      } else {
+        let initial = state.username ? state.username.charAt(0).toUpperCase() : 'U';
+        avatarElem.style.backgroundImage = '';
+        avatarElem.innerHTML = `<span id="header-avatar-text">${initial}</span>`;
+        previewElem.style.backgroundImage = '';
+        document.getElementById('profile-img-placeholder').style.display = 'block';
+        document.getElementById('profile-img-placeholder').innerText = initial;
+      }
+      updateDueCount();
+    }
+
+    function updateDueCount() {
+      const now = Date.now();
+      let due = state.cards.filter(c => c.box === 5 || c.nextReview <= now).length;
+      document.getElementById('due-count').innerText = due;
+    }
+
+    function filterByBox(boxNum) {
+      selectedBoxFilter = boxNum;
+      const resetBtn = document.getElementById('filter-reset-btn');
+      const badge = document.getElementById('card-box-badge');
+
+      if (boxNum === 0) {
+        resetBtn.classList.add('hidden');
+        badge.innerText = "Alle Boxen";
+      } else {
+        resetBtn.classList.remove('hidden');
+        badge.innerText = `Box ${boxNum}`;
+      }
+      renderNextSpacedCard();
+    }
+
+    function renderGroupDropdowns() {
+      const select = document.getElementById('select-card-group');
+      select.innerHTML = `<option value="all">📁 Alle Karten (Keine Gruppe)</option>`;
+      if(state.cardGroups) {
+        Object.keys(state.cardGroups).forEach(groupName => {
+          select.innerHTML += `<option value="${groupName}">📁 ${groupName}</option>`;
+        });
+      }
+    }
+
+    function renderNextSpacedCard() {
+      const now = Date.now();
+      let pool = state.cards.filter(c => {
+        if (selectedBoxFilter > 0 && c.box !== selectedBoxFilter) return false;
+        if (selectedGroupFilter !== 'all') {
+          let groupCardIds = state.cardGroups[selectedGroupFilter] || [];
+          if (!groupCardIds.includes(c.id)) return false;
+        }
+        if (systemMode === 'spaced') {
+          if (c.dailyCount >= MAX_DAILY_REVIEWS_PER_CARD) return false;
+          return c.box === 5 || c.nextReview <= now;
+        }
+        return true;
+      });
+
+      if (pool.length === 0) {
+        activeCard = null;
+        document.getElementById('card-question').innerText = "Keine fälligen Karten in dieser Auswahl!";
+        document.getElementById('card-answer').innerText = "Super gemacht!";
+        document.getElementById('card-review-count').innerText = "";
+        document.getElementById('type-card-question').innerText = "Keine fälligen Karten verfügbar.";
+        document.getElementById('choice-card-question').innerText = "Keine fälligen Karten verfügbar.";
+        document.getElementById('choice-options-container').innerHTML = "";
+        return;
+      }
+
+      activeCard = pool[Math.floor(Math.random() * pool.length)];
+
+      let effectiveMode = selectedCategoryMode;
+      if (effectiveMode === 'all') {
+        const modes = ['flip', 'type', 'choice'];
+        effectiveMode = modes[Math.floor(Math.random() * modes.length)];
+      }
+
+      document.getElementById('mode-container-flip').style.display = effectiveMode === 'flip' ? 'block' : 'none';
+      document.getElementById('mode-container-type').style.display = effectiveMode === 'type' ? 'block' : 'none';
+      document.getElementById('mode-container-choice').style.display = effectiveMode === 'choice' ? 'block' : 'none';
+
+      if (effectiveMode === 'flip') {
+        document.getElementById('flashcard-container').classList.remove('flipped');
+        document.getElementById('card-question').innerText = activeCard.q;
+        document.getElementById('card-answer').innerText = activeCard.a;
+        document.getElementById('card-review-count').innerText = `Box ${activeCard.box} • Heute geübt: ${activeCard.dailyCount}/${MAX_DAILY_REVIEWS_PER_CARD}`;
+      } else if (effectiveMode === 'type') {
+        document.getElementById('type-card-question').innerText = activeCard.q;
+        document.getElementById('type-user-answer').value = '';
+        document.getElementById('type-feedback').classList.add('hidden');
+      } else if (effectiveMode === 'choice') {
+        document.getElementById('choice-card-question').innerText = activeCard.q;
+        renderChoiceOptions();
+      }
+    }
+
+    function nextCard(known) {
+      if (!activeCard) return;
+      state.stats.totalAnswered++;
+      if (known) {
+        state.stats.correct++;
+        state.stats.learnedToday++;
+        state.xp += 15;
+        if (activeCard.box < 5) activeCard.box++;
+      } else {
+        activeCard.box = 1;
+      }
+
+      activeCard.dailyCount++;
+      const intervalDays = BOX_INTERVALS[activeCard.box];
+      activeCard.nextReview = Date.now() + intervalDays * 24 * 60 * 60 * 1000;
+
+      saveState();
+      renderNextSpacedCard();
+    }
+
+    function checkTypedAnswer() {
+      if(!activeCard) return;
+      const userVal = document.getElementById('type-user-answer').value.trim().toLowerCase();
+      const correctVal = activeCard.a.trim().toLowerCase();
+      const feedback = document.getElementById('type-feedback');
+
+      feedback.classList.remove('hidden');
+      if (userVal === correctVal) {
+        feedback.className = "mt-3 p-3 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200";
+        feedback.innerText = "Richtig! +15 XP";
+        setTimeout(() => nextCard(true), 1200);
+      } else {
+        feedback.className = "mt-3 p-3 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 border border-emerald-200";
+        feedback.innerText = `Leider falsch. Richtige Antwort: "${activeCard.a}"`;
+        setTimeout(() => nextCard(false), 2000);
+      }
+    }
+
+    function renderChoiceOptions() {
+      const container = document.getElementById('choice-options-container');
+      container.innerHTML = '';
+      if(!activeCard) return;
+
+      let wrongPool = state.cards.filter(c => c.a !== activeCard.a);
+      let options = [activeCard.a];
+
+      while(options.length < 3 && wrongPool.length > 0) {
+        let rand = wrongPool[Math.floor(Math.random() * wrongPool.length)];
+        if(!options.includes(rand.a)) options.push(rand.a);
+        wrongPool = wrongPool.filter(c => c.a !== rand.a);
+      }
+      options.sort(() => Math.random() - 0.5);
+
+      options.forEach(opt => {
+        let btn = document.createElement('button');
+        btn.className = "w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 p-3 rounded-xl text-xs font-bold text-slate-800 transition text-center shadow-sm";
+        btn.innerText = opt;
+        btn.onclick = () => {
+          if (opt === activeCard.a) {
+            btn.className = "w-full bg-emerald-600 text-white p-3 rounded-xl text-xs font-bold text-center";
+            setTimeout(() => nextCard(true), 800);
+          } else {
+            btn.className = "w-full bg-rose-600 text-white p-3 rounded-xl text-xs font-bold text-center";
+            setTimeout(() => nextCard(false), 1200);
+          }
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function addCustomCard() {
+      const q = document.getElementById('new-q').value.trim();
+      const a = document.getElementById('new-a').value.trim();
+      if(!q || !a) return alert("Bitte Frage und Antwort eingeben!");
+
+      state.cards.push({
+        id: Date.now(),
+        q: q,
+        a: a,
+        box: 1,
+        nextReview: Date.now(),
+        dailyCount: 0,
+        lastReviewDate: ''
+      });
+
+      document.getElementById('new-q').value = '';
+      document.getElementById('new-a').value = '';
+      saveState();
+      renderManageCards();
+      renderGroupSelectionList();
+      renderNextSpacedCard();
+      showToast("Karte erfolgreich hinzugefügt!", "✅");
+    }
+
+    function renderGroupSelectionList() {
+      const container = document.getElementById('group-selection-list');
+      container.innerHTML = '';
+      if(state.cards.length === 0) {
+        container.innerHTML = `<p class="text-[10px] text-slate-400 text-center">Keine Karten vorhanden.</p>`;
+        return;
+      }
+      state.cards.forEach(c => {
+        container.innerHTML += `
+          <label class="flex items-center space-x-2 text-xs text-slate-700 bg-white p-2 rounded-lg border border-slate-200 cursor-pointer">
+            <input type="checkbox" value="${c.id}" class="group-card-checkbox rounded text-blue-600 focus:ring-0">
+            <span class="truncate font-semibold">${c.q}</span>
+          </label>`;
+      });
+    }
+
+    function saveCardGroup() {
+      const name = document.getElementById('group-name-input').value.trim();
+      if(!name) return alert("Bitte einen Gruppennamen eingeben!");
+      const checkboxes = document.querySelectorAll('.group-card-checkbox:checked');
+      if(checkboxes.length === 0) return alert("Bitte wähle mindestens eine Karte aus!");
+
+      let cardIds = Array.from(checkboxes).map(cb => Number(cb.value));
+      if(!state.cardGroups) state.cardGroups = {};
+      state.cardGroups[name] = cardIds;
+
+      document.getElementById('group-name-input').value = '';
+      checkboxes.forEach(cb => cb.checked = false);
+      saveState();
+      renderGroupDropdowns();
+      showToast(`Gruppe "${name}" erstellt!`, "📁");
+    }
+
+    function renderManageCards() {
+      const container = document.getElementById('card-manage-list');
+      const query = document.getElementById('search-card-input').value.toLowerCase();
+      container.innerHTML = '';
+
+      let filtered = state.cards.filter(c => c.q.toLowerCase().includes(query) || c.a.toLowerCase().includes(query));
+      if (filtered.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">Keine Karten gefunden.</p>`;
+        return;
+      }
+
+      filtered.forEach(c => {
+        let div = document.createElement('div');
+        div.className = "bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-xs shadow-sm";
+        div.innerHTML = `
+          <div>
+            <p class="font-bold text-slate-800">${c.q}</p>
+            <p class="text-[10px] text-slate-500">Antwort: ${c.a} • Box ${c.box}</p>
+          </div>
+          <button onclick="deleteCard(${c.id}, event)" class="text-rose-500 font-bold p-1 hover:scale-110 transition">🗑️</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function deleteCard(id, event) {
+      if(event) event.preventDefault();
+      state.cards = state.cards.filter(c => c.id !== id);
+      if(state.cardGroups) {
+        Object.keys(state.cardGroups).forEach(g => {
+          state.cardGroups[g] = state.cardGroups[g].filter(cardId => cardId !== id);
+        });
+      }
+      saveState();
+      renderManageCards();
+      renderGroupSelectionList();
+      renderNextSpacedCard();
+      showToast("Karte gelöscht", "🗑️");
+    }
+
+    function playAlarmSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.6);
+      } catch (e) {
+        console.log("Audio nicht unterstützt", e);
+      }
+    }
+
+    function changePomodoroMode() {
+      const mode = document.getElementById('pomodoro-mode-select').value;
+      const customContainer = document.getElementById('pomodoro-custom-container');
+      if (mode === 'custom') {
+        customContainer.classList.remove('hidden');
+      } else {
+        customContainer.classList.add('hidden');
+        pomodoroTimeLeft = 25 * 60;
+        pomodoroIsStudyPhase = true;
+        document.getElementById('pomodoro-status-badge').innerText = "Lernphase (25 Min)";
+        updatePomodoroDisplay();
+      }
+    }
+
+    function updatePomodoroDisplay() {
+      let minutes = Math.floor(pomodoroTimeLeft / 60);
+      let seconds = pomodoroTimeLeft % 60;
+      document.getElementById('pomodoro-display').innerText = 
+        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function startPomodoro() {
+      if (pomodoroRunning) return;
+      const mode = document.getElementById('pomodoro-mode-select').value;
+      if (mode === 'custom' && pomodoroTimeLeft === (25 * 60)) {
+        let customStudy = parseInt(document.getElementById('custom-study-time').value) || 25;
+        pomodoroTimeLeft = customStudy * 60;
+      }
+      pomodoroRunning = true;
+      showToast("Pomodoro Timer gestartet", "⏱");
+      pomodoroTimer = setInterval(() => {
+        if (pomodoroTimeLeft > 0) {
+          pomodoroTimeLeft--;
+          updatePomodoroDisplay();
+        } else {
+          playAlarmSound();
+          clearInterval(pomodoroTimer);
+          pomodoroRunning = false;
+          let mode = document.getElementById('pomodoro-mode-select').value;
+          let customStudy = parseInt(document.getElementById('custom-study-time').value) || 25;
+          let customBreak = parseInt(document.getElementById('custom-break-time').value) || 5;
+
+          if (pomodoroIsStudyPhase) {
+            alert(`Lernphase beendet! Pause starten.`);
+            pomodoroIsStudyPhase = false;
+            pomodoroTimeLeft = (mode === 'custom' ? customBreak : 5) * 60;
+          } else {
+            alert("Pause vorbei! Zurück ans Lernen.");
+            pomodoroIsStudyPhase = true;
+            pomodoroTimeLeft = (mode === 'custom' ? customStudy : 25) * 60;
+          }
+          updatePomodoroDisplay();
+        }
+      }, 1000);
+    }
+
+    function stopPomodoro() {
+      clearInterval(pomodoroTimer);
+      pomodoroRunning = false;
+      showToast("Timer pausiert", "⏸️");
+    }
+
+    function resetPomodoro() {
+      clearInterval(pomodoroTimer);
+      pomodoroRunning = false;
+      pomodoroIsStudyPhase = true;
+      pomodoroTimeLeft = 25 * 60;
+      updatePomodoroDisplay();
+      showToast("Timer zurückgesetzt", "🔄");
+    }
+
+    function addExam() {
+      const title = document.getElementById('exam-title').value.trim();
+      const date = document.getElementById('exam-date').value;
+      if(!title || !date) return alert("Bitte Fach und Datum eingeben!");
+
+      state.exams.push({ id: Date.now(), title, date });
+      state.exams.sort((a,b) => new Date(a.date) - new Date(b.date));
+      document.getElementById('exam-title').value = '';
+      document.getElementById('exam-date').value = '';
+      saveState();
+      renderExams();
+      showToast("Prüfung eingetragen!", "📅");
+    }
+
+    function renderExams() {
+      const container = document.getElementById('exam-list');
+      container.innerHTML = '';
+      if (state.exams.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">Keine Prüfungen eingetragen.</p>`;
+        return;
+      }
+      state.exams.forEach(ex => {
+        let div = document.createElement('div');
+        div.className = "bg-white p-3.5 rounded-2xl border border-slate-200 flex justify-between items-center text-xs shadow-sm";
+        div.innerHTML = `
+          <div>
+            <p class="font-bold text-slate-900">${ex.title}</p>
+            <p class="text-[10px] text-slate-500">Datum: ${ex.date}</p>
+          </div>
+          <button onclick="deleteExam(${ex.id}, event)" class="text-rose-500 font-bold hover:scale-105 transition">Löschen</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function deleteExam(id, event) {
+      if(event) event.preventDefault();
+      state.exams = state.exams.filter(e => e.id !== id);
+      saveState();
+      renderExams();
+      showToast("Prüfung gelöscht", "🗑️");
+    }
+
+    function uploadProfileImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      showToast("Lade Profilbild...", "📷");
+      let reader = new FileReader();
+      reader.onload = function(e) {
+        state.avatar = e.target.result;
+        saveState();
+        showToast("Profilbild aktualisiert!", "✅");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openDueScheduleModal() {
+      document.getElementById('due-schedule-modal').classList.remove('hidden');
+    }
+
+    function closeDueScheduleModal() {
+      document.getElementById('due-schedule-modal').classList.add('hidden');
+    }
+
+    function openRanksModal() {
+      document.getElementById('ranks-modal').classList.remove('hidden');
+      const list = document.getElementById('ranks-list');
+      list.innerHTML = '';
+      RANKS.forEach(r => {
+        list.innerHTML += `
+          <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+            <div>
+              <p class="font-bold text-slate-900">Level ${r.level}: ${r.title}</p>
+              <p class="text-[10px] text-slate-500">Ab ${r.minXp} XP</p>
+            </div>
+            <span>⭐</span>
+          </div>`;
+      });
+    }
+
+    function closeRanksModal() {
+      document.getElementById('ranks-modal').classList.add('hidden');
+    }
+
+    window.onload = function() {
+      checkSession();
+    };
+  </script>
+</body>
+</html>
